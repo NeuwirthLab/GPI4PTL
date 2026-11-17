@@ -8,22 +8,6 @@
 
 ******************************************************************************
 
-## GPI4PTL: modifications and license
-
-GPI4PTL is a modified version of GPI-2, originally developed by Fraunhofer
-ITWM. Niklas Bartelheimer modified this version as follows:
-
-- 2026-10-03: Added the Portals4 transport, build integration, and tests.
-- 2026-11-15: Revised Portals4 data/notification ordering and passive
-  communication, including ordering and restart guarantees.
-- 2026-11-16: Revised Portals4 write/notification ordering to use BXI
-  `PTL_TOTAL_DATA_ORDERING` for eligible small messages and fenced
-  synchronization for other cases.
-
-This modified work is released under the GNU General Public License,
-version 3; see [COPYING](COPYING) for the full license text. Existing
-copyright, license, and warranty notices remain applicable.
-
 ## 1. INTRODUCTION
 
 GPI-2 is the second generation of GPI (www.gpi-site.com). GPI-2

@@ -41,7 +41,10 @@ SRCS += devices/portals4/GPI2_PORTALS4.c devices/portals4/GPI2_PORTALS4_IO.c \
 devices/portals4/GPI2_PORTALS4_PASSIVE.c devices/portals4/GPI2_PORTALS4_ATOMIC.c \
 devices/portals4/GPI2_PORTALS4_GRP.c devices/portals4/GPI2_PORTALS4_SEG.c \
 devices/portals4/GPI2_PORTALS4.h
-default_includes += -I$(abs_top_srcdir)/src/devices/portals4 @PORTALS4_CFLAGS@ -DGPI2_DEVICE_PORTALS4
+default_includes += -I$(top_builddir) -I$(abs_top_srcdir)/src/devices/portals4 @PORTALS4_CFLAGS@ -DGPI2_DEVICE_PORTALS4
+if WITH_XPMEM
+default_includes += @XPMEM_CFLAGS@
+endif
 endif
 #else
 if WITH_ETHERNET
@@ -79,7 +82,7 @@ lib_LTLIBRARIES = libGPI2.la
 libGPI2_la_SOURCES = $(SRCS)
 libGPI2_la_CFLAGS = $(lib_default_cflags) -O2
 libGPI2_la_CPPFLAGS = $(default_includes)
-libGPI2_la_LIBADD = @ac_lib_portals4@
+libGPI2_la_LIBADD = @ac_lib_portals4@ @ac_lib_xpmem@
 
 # DEBUG AND STAT LIBRARIES
 if ENABLE_DEBUG
@@ -87,7 +90,7 @@ lib_LTLIBRARIES += libGPI2-dbg.la
 libGPI2_dbg_la_SOURCES = $(SRCS)
 libGPI2_dbg_la_CFLAGS = $(lib_default_cflags) -g -O0 -DDEBUG
 libGPI2_dbg_la_CPPFLAGS = $(default_includes)
-libGPI2_dbg_la_LIBADD = @ac_lib_portals4@
+libGPI2_dbg_la_LIBADD = @ac_lib_portals4@ @ac_lib_xpmem@
 if ENABLE_ASAN
 libGPI2_dbg_la_CFLAGS += -fno-omit-frame-pointer -fsanitize=address
 endif
@@ -104,7 +107,7 @@ lib_LTLIBRARIES += libGPI2-stats.la
 libGPI2_stats_la_SOURCES = $(SRCS)
 libGPI2_stats_la_CFLAGS = $(lib_default_cflags) -g -O0 -DGPI2_STATS -DGPI2_TRACE -DDEBUG
 libGPI2_stats_la_CPPFLAGS = $(default_includes)
-libGPI2_stats_la_LIBADD = @ac_lib_portals4@
+libGPI2_stats_la_LIBADD = @ac_lib_portals4@ @ac_lib_xpmem@
 endif
 
 # FORTRAN MODULES

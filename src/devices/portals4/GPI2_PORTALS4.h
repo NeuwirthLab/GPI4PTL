@@ -20,11 +20,39 @@ along with GPI-2. If not, see <http://www.gnu.org/licenses/>.
 #ifndef _GPI2_PORTALS4_H_
 #define _GPI2_PORTALS4_H_
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "GPI2_Dev.h"
 #include "GPI2_Utility.h"
 #include <string.h>
 #include <portals4.h>
 #include <stdint.h>
+
+#ifdef GPI2_PORTALS4_XPMEM
+#include <xpmem.h>
+/* The common notification poller uses volatile loads. Its external-call
+   boundary and x86 load ordering supply the receive-side ordering here.
+   Other architectures require an acquire in that common poller first. */
+#if !defined(__x86_64__)
+#error "Portals4 XPMEM currently requires x86-64"
+#endif
+typedef struct
+{
+  void *mapping;
+  uintptr_t address;
+  size_t size, delta;
+} portals4_xpmem_mapping;
+
+typedef struct
+{
+  int local;
+  xpmem_apid_t apid;
+  volatile unsigned char lock;
+  portals4_xpmem_mapping *mappings;
+} portals4_xpmem_peer;
+#endif
 
 #define PORTALS4_DATA_PT_INDEX 0
 #define PORTALS4_PASSIVE_PT_INDEX 1
@@ -37,6 +65,9 @@ along with GPI-2. If not, see <http://www.gnu.org/licenses/>.
 struct portals4_ctx_info
 {
   ptl_process_t phys_address;
+  /* Keep the exchange layout identical in enabled and disabled builds. */
+  int64_t xpmem_segid;
+  uint32_t xpmem_enabled;
 };
 
 typedef struct
@@ -100,7 +131,37 @@ typedef struct
   ptl_size_t ordered_size;
   struct portals4_ctx_info* local_info;
   struct portals4_ctx_info* remote_info;
+#ifdef GPI2_PORTALS4_XPMEM
+  xpmem_segid_t xpmem_segid;
+  size_t xpmem_page_size;
+  portals4_xpmem_peer *xpmem_peers;
+#endif
 } gaspi_portals4_ctx;
+
+#ifdef GPI2_PORTALS4_XPMEM
+int pgaspi_portals4_xpmem_endpoint(const gaspi_context_t *gctx, int rank);
+int pgaspi_portals4_xpmem_connect(const gaspi_context_t *gctx, int rank);
+int pgaspi_portals4_xpmem_disconnect(const gaspi_context_t *gctx, int rank);
+int pgaspi_portals4_xpmem_cleanup(const gaspi_context_t *gctx);
+gaspi_return_t pgaspi_portals4_xpmem_copy(gaspi_context_t *gctx,
+    gaspi_rank_t rank, gaspi_segment_id_t segment, gaspi_offset_t offset,
+    void *buffer, gaspi_size_t size, int read);
+gaspi_return_t pgaspi_portals4_xpmem_notify(gaspi_context_t *gctx,
+    gaspi_rank_t rank, gaspi_segment_id_t segment,
+    gaspi_notification_id_t id, gaspi_notification_t value);
+#endif
+
+static inline int
+pgaspi_portals4_is_local(const gaspi_portals4_ctx *dev, gaspi_rank_t rank)
+{
+#ifdef GPI2_PORTALS4_XPMEM
+  return dev->xpmem_peers[rank].local;
+#else
+  (void)dev;
+  (void)rank;
+  return 0;
+#endif
+}
 
 void pgaspi_portals4_passive_reset(gaspi_portals4_ctx* dev);
 int pgaspi_portals4_passive_init(gaspi_context_t* gctx);

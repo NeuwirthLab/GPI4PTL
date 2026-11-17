@@ -171,6 +171,9 @@ AC_ARG_WITH([ethernet],[AS_HELP_STRING([--with-ethernet], [compile for ethernet]
 #  WHAT DEVICE IS REALLY USABLE
 ACX_USABLE_DEVICE
 
+# OPTIONAL PORTALS4 LOCAL TRANSPORT
+ACX_PORTALS4_XPMEM
+
 # BATCH SYSTEM
 #  PBS
 AC_ARG_WITH(pbs,[AS_HELP_STRING([--with-pbs],[compile with PBS support])],

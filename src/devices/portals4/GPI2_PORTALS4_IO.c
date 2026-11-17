@@ -23,7 +23,9 @@ along with GPI-2. If not, see <http://www.gnu.org/licenses/>.
 #include "GPI2_Sys.h"
 #include <time.h>
 
-/* Communication functions */
+/* Communication functions. Local XPMEM operations finish in the caller,
+   never enter the Portals CT count, and never drain unrelated network work.
+   Retain the common queue's existing capacity checks before dispatch. */
 /* Complete preceding queue requests and retire them from public accounting.
    The common runtime holds lockC[queue]. Errors leave accounting intact for
    wait/purge; only successful completion permits notification submission. */
@@ -66,6 +68,14 @@ pgaspi_dev_write(gaspi_context_t* const gctx,
     return GASPI_QUEUE_FULL;
   }
 
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    return pgaspi_portals4_xpmem_copy(gctx, rank, segment_id_remote,
+        offset_remote, (void *)(uintptr_t)local_offset, size, 0);
+  }
+#endif
+
   ret = PtlPut(dev->comm_notif_md_h[queue], local_offset, size,
                PORTALS4_ACK_TYPE, dev->remote_info[rank].phys_address,
                dev->data_pt_idx, 0, remote_offset, (void*)(uintptr_t)rank, 0);
@@ -99,6 +109,14 @@ pgaspi_dev_read(gaspi_context_t* const gctx,
   {
     return GASPI_QUEUE_FULL;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    return pgaspi_portals4_xpmem_copy(gctx, rank, segment_id_remote,
+        offset_remote, (void *)(uintptr_t)local_offset, size, 1);
+  }
+#endif
 
   ret = PtlGet(dev->comm_notif_md_h[queue], local_offset, size,
                dev->remote_info[rank].phys_address, dev->data_pt_idx, 0,
@@ -202,6 +220,22 @@ pgaspi_dev_write_list(gaspi_context_t* const gctx, const gaspi_number_t num,
     return GASPI_QUEUE_FULL;
   }
 
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    for(gaspi_number_t i = 0; i < num; ++i)
+    {
+      if(size[i] == 0)
+        continue;
+      ret = pgaspi_dev_write(gctx, segment_id_local[i], offset_local[i], rank,
+          segment_id_remote[i], offset_remote[i], size[i], queue);
+      if(ret != GASPI_SUCCESS)
+        return ret;
+    }
+    return GASPI_SUCCESS;
+  }
+#endif
+
   ret = PtlStartBundle(dev->ni_h);
 
   if(ret != PTL_OK)
@@ -264,6 +298,22 @@ pgaspi_dev_read_list(gaspi_context_t* const gctx, const gaspi_number_t num,
   {
     return GASPI_QUEUE_FULL;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    for(gaspi_number_t i = 0; i < num; ++i)
+    {
+      if(size[i] == 0)
+        continue;
+      ret = pgaspi_dev_read(gctx, segment_id_local[i], offset_local[i], rank,
+          segment_id_remote[i], offset_remote[i], size[i], queue);
+      if(ret != GASPI_SUCCESS)
+        return ret;
+    }
+    return GASPI_SUCCESS;
+  }
+#endif
 
   ret = PtlStartBundle(dev->ni_h);
   if(ret != PTL_OK)
@@ -328,6 +378,14 @@ pgaspi_dev_notify(gaspi_context_t* const gctx,
     return GASPI_QUEUE_FULL;
   }
 
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    return pgaspi_portals4_xpmem_notify(gctx, rank, segment_id_remote,
+        notification_id, notification_value);
+  }
+#endif
+
   /* Preceding writes may exceed the hardware ordering limit. Without
      tracking their sizes, standalone notifications must complete the queue. */
   if(gctx->ne_count_c[queue])
@@ -371,6 +429,18 @@ pgaspi_dev_write_notify(
   {
     return GASPI_QUEUE_FULL;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    ret = pgaspi_dev_write(gctx, segment_id_local, offset_local, rank,
+        segment_id_remote, offset_remote, size, queue);
+    if(ret != GASPI_SUCCESS)
+      return ret;
+    return pgaspi_portals4_xpmem_notify(gctx, rank, segment_id_remote,
+        notification_id, notification_value);
+  }
+#endif
 
   ret = PtlPut(dev->comm_notif_md_h[queue], local_offset, size,
                PORTALS4_ACK_TYPE, dev->remote_info[rank].phys_address,
@@ -428,6 +498,18 @@ pgaspi_dev_write_list_notify(
   {
     return GASPI_QUEUE_FULL;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    ret = pgaspi_dev_write_list(gctx, num, segment_id_local, offset_local,
+        rank, segment_id_remote, offset_remote, size, queue);
+    if(ret != GASPI_SUCCESS)
+      return ret;
+    return pgaspi_portals4_xpmem_notify(gctx, rank, segment_id_notification,
+        notification_id, notification_value);
+  }
+#endif
 
   ret = PtlStartBundle(dev->ni_h);
   if(ret != PTL_OK)
@@ -511,6 +593,20 @@ pgaspi_dev_read_notify(
     return GASPI_QUEUE_FULL;
   }
 
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    ret = pgaspi_dev_read(gctx, segment_id_local, offset_local, rank,
+        segment_id_remote, offset_remote, size, queue);
+    if(ret != GASPI_SUCCESS)
+      return ret;
+    gaspi_notification_t *notification =
+        gctx->rrmd[segment_id_local][gctx->rank].notif_spc.ptr;
+    __atomic_store_n(&notification[notification_id], 1, __ATOMIC_RELEASE);
+    return GASPI_SUCCESS;
+  }
+#endif
+
   ret = PtlGet(dev->comm_notif_md_h[queue], local_offset, size,
                dev->remote_info[rank].phys_address, dev->data_pt_idx, 0,
                remote_offset, (void*)(uintptr_t)rank);
@@ -564,6 +660,20 @@ pgaspi_dev_read_list_notify(
   {
     return GASPI_QUEUE_FULL;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_is_local(dev, rank))
+  {
+    ret = pgaspi_dev_read_list(gctx, num, segment_id_local, offset_local,
+        rank, segment_id_remote, offset_remote, size, queue);
+    if(ret != GASPI_SUCCESS)
+      return ret;
+    gaspi_notification_t *notification =
+        gctx->rrmd[segment_id_notification][gctx->rank].notif_spc.ptr;
+    __atomic_store_n(&notification[notification_id], 1, __ATOMIC_RELEASE);
+    return GASPI_SUCCESS;
+  }
+#endif
 
   ret = PtlStartBundle(dev->ni_h);
 

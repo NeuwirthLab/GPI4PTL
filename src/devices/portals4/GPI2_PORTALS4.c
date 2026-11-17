@@ -54,6 +54,9 @@ pgaspi_dev_init_core(gaspi_context_t* const gctx)
   gaspi_portals4_ctx* const portals4_dev_ctx =
       (gaspi_portals4_ctx*)gctx->device->ctx;
 
+#ifdef GPI2_PORTALS4_XPMEM
+  portals4_dev_ctx->xpmem_segid = -1;
+#endif
   portals4_dev_ctx->ni_h = PTL_INVALID_HANDLE;
   portals4_dev_ctx->group_atomic_md_h = PTL_INVALID_HANDLE;
   portals4_dev_ctx->atomic_md_h = PTL_INVALID_HANDLE;
@@ -186,6 +189,24 @@ pgaspi_dev_init_core(gaspi_context_t* const gctx)
     pgaspi_dev_cleanup_core(gctx);
     return GASPI_ERROR;
   }
+
+#ifdef GPI2_PORTALS4_XPMEM
+  long page_size = sysconf(_SC_PAGESIZE);
+  portals4_dev_ctx->xpmem_peers = calloc(gctx->tnc, sizeof(portals4_xpmem_peer));
+  if(portals4_dev_ctx->xpmem_peers == NULL)
+  {
+    pgaspi_dev_cleanup_core(gctx);
+    return GASPI_ERROR;
+  }
+  for(int i = 0; i < gctx->tnc; ++i)
+    portals4_dev_ctx->xpmem_peers[i].apid = -1;
+  if(page_size <= 0)
+  {
+    pgaspi_dev_cleanup_core(gctx);
+    return GASPI_ERROR;
+  }
+  portals4_dev_ctx->xpmem_page_size = (size_t)page_size;
+#endif
 
   ptl_process_t phys_address;
   ret = PtlGetPhysId(portals4_dev_ctx->ni_h, &phys_address);
@@ -495,6 +516,10 @@ pgaspi_dev_create_endpoint(gaspi_context_t const* const gctx, const int i,
 {
   gaspi_portals4_ctx* const portals4_dev_ctx =
       (gaspi_portals4_ctx*)gctx->device->ctx;
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_xpmem_endpoint(gctx, i) != GASPI_SUCCESS)
+    return GASPI_ERROR;
+#endif
   *info = &portals4_dev_ctx->local_info[i];
   *remote_info = &portals4_dev_ctx->remote_info[i];
   *info_size = sizeof(struct portals4_ctx_info);
@@ -502,10 +527,15 @@ pgaspi_dev_create_endpoint(gaspi_context_t const* const gctx, const int i,
 }
 
 int
-pgaspi_dev_disconnect_context(gaspi_context_t* const GASPI_UNUSED(gctx),
-                              const int GASPI_UNUSED(i))
+pgaspi_dev_disconnect_context(gaspi_context_t* const gctx, const int i)
 {
+#ifdef GPI2_PORTALS4_XPMEM
+  return pgaspi_portals4_xpmem_disconnect(gctx, i);
+#else
+  (void)gctx;
+  (void)i;
   return GASPI_SUCCESS;
+#endif
 }
 
 int
@@ -517,10 +547,14 @@ pgaspi_dev_comm_queue_connect(gaspi_context_t const* const GASPI_UNUSED(gctx),
 }
 
 int
-pgaspi_dev_connect_context(gaspi_context_t const* const GASPI_UNUSED(gctx),
-                           const int GASPI_UNUSED(i))
+pgaspi_dev_connect_context(gaspi_context_t const* const gctx, const int i)
 {
-  return GASPI_SUCCESS;
+#ifdef GPI2_PORTALS4_XPMEM
+  return pgaspi_portals4_xpmem_connect(gctx, i);
+#else
+  const gaspi_portals4_ctx *dev = gctx->device->ctx;
+  return dev->remote_info[i].xpmem_enabled ? GASPI_ERROR : GASPI_SUCCESS;
+#endif
 }
 
 int
@@ -537,6 +571,10 @@ pgaspi_dev_cleanup_core(gaspi_context_t* const gctx)
     gctx->device = NULL;
     return GASPI_SUCCESS;
   }
+#ifdef GPI2_PORTALS4_XPMEM
+  if(pgaspi_portals4_xpmem_cleanup(gctx) != GASPI_SUCCESS)
+    return GASPI_ERROR;
+#endif
   if(!PtlHandleIsEqual(dev->group_atomic_md_h, PTL_INVALID_HANDLE))
   {
     ret = PtlMDRelease(dev->group_atomic_md_h);
