@@ -1,0 +1,94 @@
+Tests directory
+===============
+
+This directory contains tests for full coverage of the interface and
+the typical benchmarks.
+
+Organization
+============
+
+There are 2 main sub-directories: microbenchmarks and tests:
+
+- microbenchmarks contains the usual latency, bandwidth and others.
+
+- tests contains all the tests. This directory is divided in several
+  sub-directories that organize the tests on how they test particular
+  functionality (initialization, communication, collectives, etc.).
+
+Usage
+=====
+
+## Tests ##
+
+The runtests.sh script is the driver to run all tests. It expects that
+a machine file named 'machines' resides on the same directory, e.g.:
+
+    ./runtests.sh
+        runs all available tests.
+
+    ./runtests.sh gpiapp.bin
+       runs a particular test (gpiapp).
+
+    ./runtests.sh -f
+        a quick overall check
+
+If it does not exist in the directory, the 'machines' file can be
+specified with the `-m` flag and arbitrary name, e.g.:
+
+    ./runtests.sh -m ~/machines_for_gpi
+
+Note, just as with `gaspi_run`, the number of processes to start from
+the machine file can be given by using `-n`.
+
+When testing GPI-2 or debugging the tests, by default, a log file
+(runtests_$(date -Idate).log) will be available, in the same
+directory, to view the output of some or all of the tests (the name of
+the logfile can also be specified with `-o`)
+
+Finally, the maximum time to skip a given test (set by default to 1200
+s) can be changed by:
+
+    ./runtests.sh -e 10
+
+## Microbenchmarks ##
+
+These binaries can be run directly using `gaspi_run`, e.g., after
+compilation/installation:
+
+    gaspi_run -m ~/machines microbenchmarks/bin/ping_pong.bin
+
+assuming `tests` is the actual directory, of course.
+
+Definitions file
+================
+
+It is possible to define a definitions file for each test to define
+command line arguments. Each definition file must be placed in the
+defs directory with a name <test_name.def>.
+
+A default definitions file is placed (default.def) to allow for other
+(general) definitions. For now only the network type is supported,
+allowing to define on which network type (IB or Ethernet) the test
+should run. See the defs/default.def file.
+
+New Tests
+=========
+
+Adding new tests is easy: simply add the test source code to one of
+the test directories and add the test to the respective Makefile.
+Each test should include <test_utils.h> and call TSUITE_INIT.
+
+Examples (new_test.c):
+#include <GASPI.h>
+#include <test_utils.h>
+
+int  main(int argc, char *argv[])
+{
+  TSUITE_INIT(argc, argv);
+  ASSERT(gaspi_proc_init(GASPI_BLOCK));
+
+  ASSERT(gaspi_proc_term(GASPI_BLOCK));
+  return EXIT_SUCCESS;
+}
+
+Have fun!

@@ -1,0 +1,156 @@
+#!/bin/sh
+
+# Copyright (c) Fraunhofer ITWM, 2013-2026
+
+# This file is part of GPI-2.
+
+# GPI-2 is free software; you can redistribute it
+# and/or modify it under the terms of the GNU General Public License
+# version 3 as published by the Free Software Foundation.
+
+# GPI-2 is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with GPI-2. If not, see <http://www.gnu.org/licenses/>.
+
+PRG=$(/bin/cat /tmp/.last_gaspi_prg 2> /dev/null)
+MFILE=""
+PRG_OVERRIDE=""
+
+#helper functions
+usage()
+{
+    echo "The gaspi_cleanup utility tries to kill the last run GASPI application."
+    echo "This can be useful if the application was interrupted or finished unproperly."
+    echo "Some resources might still be in use (particularly on remote nodes)."
+    echo "For instance, a necessary port might still be in use."
+    echo "Note: there is no guarantee for this operations to be always successful."
+    echo
+    echo "Usage: gaspi_cleanup -m <machinefile> [-p <program>]"
+    echo "OR"
+    echo "gaspi_cleanup --machinefile <machinefile> [--program <program>]"
+    echo
+    echo "Other options:"
+    echo "   -c, --check       Only check if GASPI program is running on hosts."
+    echo "   -p, --program     Program name to kill (default: last run from /tmp/.last_gaspi_prg)."
+    echo "   -h, --help        This help."
+    echo
+}
+
+validate_machinefile()
+{
+    #empty
+    if [ ! -s "$1" ]; then
+        echo "Empty machine file ($1)"
+        exit 1
+    fi
+
+    GASPI_HOSTS=$(sort -u "$1")
+
+    for i in $GASPI_HOSTS
+    do
+        if ! ping -c 1 "$i" > /dev/null 2>&1 ; then
+           echo "Host not reachable ($i)"
+        fi
+    done
+}
+
+kill_procs()
+{
+    GASPI_PRG=$(basename "$1")
+    GASPI_HOSTS=$(sort -u "$2")
+    GASPI_USER=$(id -un)
+
+    for i in $GASPI_HOSTS
+    do
+        { ssh -o ConnectTimeout=10 -o BatchMode=yes "$i" "pkill -KILL -x -u $GASPI_USER -- $GASPI_PRG; pkill -KILL -x -u $GASPI_USER -- lt-$GASPI_PRG; true" > /dev/null 2>&1 || echo "Warning: could not reach $i"; } &
+    done
+    wait
+}
+
+check_gaspi_procs()
+{
+    GASPI_PRG=$(basename "$1")
+    GASPI_HOSTS=$(sort -u "$2")
+    GASPI_USER=$(id -un)
+
+    for i in $GASPI_HOSTS
+    do
+        if ssh -o ConnectTimeout=10 -o BatchMode=yes "$i" "pgrep -x -u $GASPI_USER -- $GASPI_PRG > /dev/null 2>&1"; then
+            echo "$GASPI_PRG running on $i"
+        fi
+    done
+}
+
+#handle --help before any other validation so it always works
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    usage
+    exit 0
+fi
+
+#at least we need machinefile
+if [ $# -lt 2 ]; then
+    echo "Error: You need to provide a machinefile (-m option). Use -h or --help to view options."
+    exit 1
+fi
+
+
+check_only_option=0
+while [ "$1" != "" ]; do
+    case $1 in
+        -c | --check)
+            check_only_option=1
+            ;;
+	-h | --help)
+	    usage
+	    exit 0
+	    ;;
+        -p | --program)
+            shift
+            if [ -z "$1" ]; then
+                echo "Error: -p requires a program name argument."
+                exit 1
+            fi
+            PRG_OVERRIDE=$1
+            ;;
+        -m | --machinefile)
+            shift
+            if [ -r "$1" ]; then
+                MFILE=$1
+            else
+                echo "Error: Cannot read file $1 (-m option) (or file does not exist)"
+                exit 1
+            fi
+            ;;
+        -* | --*)
+            echo "Error: Unknown option $1. Use -h or --help for help."
+            exit 1
+            ;;
+        *)
+            echo "Error: Unknown option $1. Use -h or --help for help."
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ -n "$PRG_OVERRIDE" ]; then
+    PRG="$PRG_OVERRIDE"
+elif [ -z "$PRG" ]; then
+    echo "Error: GASPI application to cleanup not found."
+    echo "Use -p <program> to specify the program name explicitly."
+    exit 1
+fi
+
+validate_machinefile "$MFILE"
+
+if [ $check_only_option = 1 ]; then
+    check_gaspi_procs "$PRG" "$MFILE"
+else
+    kill_procs "$PRG" "$MFILE"
+fi
+
+exit 0
