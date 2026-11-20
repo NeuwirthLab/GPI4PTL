@@ -1,5 +1,6 @@
 machines
 *.txt
+!/ChangeLog.txt
 *.log
 
 src/gaspi_logger

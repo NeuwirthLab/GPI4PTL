@@ -1,9 +1,8 @@
 /*
-Copyright (c) Goethe University Frankfurt MSQC - Niklas Bartelheimer
-<bartelheimer@em.uni-frankfurt.de>, 2023-2024
 Copyright (c) Johannes Gutenberg-University Mainz HPCA - Niklas Bartelheimer
 <bartelheimer@uni-mainz.de>, 2024-2026
-This file is part of GPI-2.
+
+This file is part of GPI4PTL.
 
 GPI4PTL is free software; you can redistribute it
 and/or modify it under the terms of the GNU General Public License

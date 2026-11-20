@@ -3,8 +3,8 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: GPI-2
-Description: GPI-2 library
+Name: GPI4PTL
+Description: GASPI communication library with Portals4 support
 Version: @VERSION@
 Cflags: -I${includedir}
 Libs: -L${libdir} -lGPI2

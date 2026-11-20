@@ -1,20 +1,20 @@
 /*
-Copyright (c) Goethe University Frankfurt - Niklas Bartelheimer
-<bartelheimer@em.uni-frankfurt.de>, 2023-2026
+Copyright (c) Johannes Gutenberg-University Mainz HPCA - Niklas Bartelheimer
+<bartelheimer@uni-mainz.de>, 2024-2026
 
-This file is part of GPI-2.
+This file is part of GPI4PTL.
 
-GPI-2 is free software; you can redistribute it
+GPI4PTL is free software; you can redistribute it
 and/or modify it under the terms of the GNU General Public License
 version 3 as published by the Free Software Foundation.
 
-GPI-2 is distributed in the hope that it will be useful,
+GPI4PTL is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GPI-2. If not, see <http://www.gnu.org/licenses/>.
+along with GPI4PTL. If not, see <http://www.gnu.org/licenses/>.
 */
 #include "GASPI.h"
 #include "GPI2.h"

@@ -1,0 +1,7 @@
+GPI4PTL changes by Niklas Bartelheimer
+
+- 2026-10-03 Added the Portals4 device, build integration, and tests.
+- 2026-11-15 Revised data and notification ordering and updated passive
+  communication to handle ordering and restart.
+- 2026-11-16 Enabled BXI PTL_TOTAL_DATA_ORDERING for eligible small
+  write-notify operations and used fenced synchronization for other cases.
